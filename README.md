@@ -9,6 +9,8 @@ and splashes them.
 Open `index.html` in a browser. No install or build needed.
 (If your browser blocks local files, run `python3 -m http.server` here and open http://localhost:8000.)
 
+Online version: https://oscarolbe.github.io/typingsnail/ (deployed by GitHub Actions on every push to `master`).
+
 ## How it works
 
 - 64 levels in 6 worlds, from never touching a keyboard to typing fast with no mistakes:
