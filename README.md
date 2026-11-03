@@ -32,7 +32,7 @@ Online version: https://oscarolbe.github.io/typingsnail/ (deployed by GitHub Act
 ## Game controller world
 
 A 7th world, **Controller**, practices the four face buttons (A, B, X, Y) of a game
-controller (tested layout: Xbox-style, like most Shanwan pads: Y top, X left, B right, A bottom).
+controller, Nintendo-style layout like our Shanwan pad: X top, Y left, A right, B bottom.
 It is open from the start and keeps its own stars and bike speed. It starts with A, then B,
 then X and Y, and ends with mixed, faster levels.
 The bottom of the screen shows a controller with the button to press glowing.

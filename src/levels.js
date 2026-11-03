@@ -179,11 +179,12 @@ const TYPABLE = new Set(KB_ROWS.join(''));
 // Shift or Caps Lock versions of the punctuation keys count as the plain key.
 const SHIFTED = { ':': ';', '<': ',', '>': '.', '?': '/' };
 
-// Controller face buttons (Xbox-style layout, the usual one on Shanwan pads).
+// Controller face buttons, Nintendo-style layout (as on our Shanwan pad):
+// X top, Y left, A right, B bottom.
 // Standard Gamepad API mapping is by position: 0 bottom, 1 right, 2 left, 3 top.
-const PAD_BUTTONS = { 0: 'a', 1: 'b', 2: 'x', 3: 'y' };
+const PAD_BUTTONS = { 0: 'b', 1: 'a', 2: 'y', 3: 'x' };
 const PAD_COLORS = { a: '#51cf66', b: '#ff6b6b', x: '#4dabf7', y: '#fcc419' };
-const PAD_POS = { a: [0, 1], b: [1, 0], x: [-1, 0], y: [0, -1] };
+const PAD_POS = { a: [1, 0], b: [0, 1], x: [0, -1], y: [-1, 0] };
 
 // How the voice says each key (plain letters get read as words otherwise).
 const KEY_SAY = {

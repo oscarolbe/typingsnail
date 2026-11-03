@@ -1127,7 +1127,7 @@
 
   // ---- Game controller ------------------------------------------------------
   // Polled every frame. Face buttons play controller levels; on every other screen
-  // A works like Space, B like Esc, Start pauses/continues and the D-pad or stick moves.
+  // A (right button) works like Space, B (bottom) like Esc, Start pauses/continues and the D-pad or stick moves.
   const padHeld = {};
   let stickDir = null;
 
@@ -1146,7 +1146,7 @@
       else if (face && game.cfg.pad) typeKey(face);
       return;
     }
-    const map = { 0: ' ', 1: 'Escape', 9: ' ', 12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight' };
+    const map = { 1: ' ', 0: 'Escape', 9: ' ', 12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight' };
     if (map[btn]) handleKey(map[btn], {});
   }
 
