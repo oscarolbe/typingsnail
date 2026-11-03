@@ -34,7 +34,7 @@
   // ---- Save data ------------------------------------------------------------
   const SAVE_KEY = 'typing-snails-v2';
   const save = (() => {
-    const base = { stars: [], spl: SPL_START, sound: true, unlockAll: false };
+    const base = { stars: [], spl: SPL_START, padSpl: SPL_START, sound: true, unlockAll: false };
     try { return Object.assign(base, JSON.parse(localStorage.getItem(SAVE_KEY)) || {}); }
     catch (e) { return base; }
   })();
@@ -56,7 +56,11 @@
 
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const isUnlocked = i => i === 0 || save.unlockAll || (save.stars[i - 1] || 0) > 0;
+  // A world marked `pad` (the controller world) is open from the start.
+  const isUnlocked = i => i === 0 || save.unlockAll || (save.stars[i - 1] || 0) > 0
+    || (WORLDS[LEVELS[i].world].pad && WORLDS[LEVELS[i].world].start === i);
+  const PAD_WORLD = WORLDS.findIndex(w => w.pad);
+  let lastInput = 'key'; // 'key' | 'pad': which device the child used last
   const aliveSlots = () => game.snails.map((s, i) => (s.alive ? i : -1)).filter(i => i >= 0);
   const bikeLook = () => ({ color: pick(BIKE_COLORS), helmet: pick(HELMETS), shirt: pick(SHIRTS) });
 
@@ -73,11 +77,14 @@
 
   // ---- Flow -----------------------------------------------------------------
   function goMenu() {
+    // Stay in the world being played; a controller player starts in the controller world.
+    const w = game ? game.cfg.world : lastInput === 'pad' && PAD_WORLD >= 0 ? PAD_WORLD : 0;
+    const ids = worldLevels(w);
     screen = 'menu';
     game = null;
     particles = [];
-    menuSel = 0;
-    while (menuSel < LEVELS.length - 1 && (save.stars[menuSel] || 0) > 0) menuSel++;
+    menuSel = ids[0];
+    while (menuSel < ids[ids.length - 1] && (save.stars[menuSel] || 0) > 0) menuSel++;
     Sound.hush();
   }
 
@@ -93,14 +100,14 @@
     particles = [];
     screen = 'intro';
     Sound.say(cfg.words ? "Let's type some words!"
-      : cfg.pool === 'all' ? "Let's practice all your keys!"
-      : 'Keys: ' + [...cfg.keys].map(c => KEY_SAY[c]).join(', '));
+      : cfg.pool === 'all' ? `Let's practice all your ${cfg.pad ? 'buttons' : 'keys'}!`
+      : (cfg.pad ? 'Buttons: ' : 'Keys: ') + [...cfg.keys].map(c => KEY_SAY[c]).join(', '));
   }
 
   // Seconds the child gets per letter on this level.
   function secondsPerLetter() {
     const cfg = game.cfg;
-    return Math.min(save.spl, cfg.maxSpl || Infinity) * cfg.slow;
+    return Math.min(cfg.pad ? save.padSpl : save.spl, cfg.maxSpl || Infinity) * cfg.slow;
   }
 
   function beginPlay() {
@@ -151,8 +158,10 @@
     if (c) Sound.say(KEY_SAY[c]);
   }
 
+  // Keyboard and controller each keep their own adaptive speed.
   function adjustSpeed(factor) {
-    save.spl = clamp(save.spl * factor, SPL_MIN, SPL_MAX);
+    const k = game.cfg.pad ? 'padSpl' : 'spl';
+    save[k] = clamp((save[k] || SPL_START) * factor, SPL_MIN, SPL_MAX);
     persist();
   }
 
@@ -281,7 +290,7 @@
   function resetProgress() {
     if (resetArmed > 0) {
       save.stars = [];
-      save.spl = SPL_START;
+      save.spl = save.padSpl = SPL_START;
       save.unlockAll = false;
       persist();
       resetArmed = 0;
@@ -576,7 +585,7 @@
       const { min, max } = cfg.words;
       return `Words: ${min === max ? min : `${min}–${max}`} letters`;
     }
-    if (cfg.pool === 'all') return 'All keys';
+    if (cfg.pool === 'all') return cfg.pad ? 'All buttons' : 'All keys';
     return [...cfg.keys].join(' ').toUpperCase() + (cfg.pool === 'mix' ? ' + old' : '');
   }
 
@@ -608,7 +617,7 @@
         ctx.save();
         ctx.translate(cx, cy);
         ctx.scale(s, s);
-        ctx.fillStyle = FINGER_COLORS[fingerOf(c)];
+        ctx.fillStyle = keyColor(c);
         ctx.beginPath(); ctx.arc(0, 0, 32, 0, TAU); ctx.fill();
         text(label, 0, 2, 54, '#212529', { weight: 700 });
         ctx.restore();
@@ -625,7 +634,10 @@
     rr(ctx, x + 18, y + h - 13, (w - 36) * left, 7, 3.5); ctx.fill();
   }
 
+  const keyColor = c => (game && game.cfg.pad ? PAD_COLORS[c] : FINGER_COLORS[fingerOf(c)]);
+
   function drawKeyboardArea() {
+    if (game.cfg.pad) return drawControllerArea();
     const g = game, all = g.keys.all;
     const target = screen === 'intro' ? g.keys.fresh[Math.floor(time) % g.keys.fresh.length] : currentLetter();
 
@@ -667,6 +679,90 @@
     Art.hand(ctx, 172, 636, true, { lit, target: tf, t: time });
     Art.hand(ctx, W - 172, 636, false, { lit, target: tf, t: time });
     if (tf >= 0) text(FINGER_NAMES[tf], tf < 5 ? 172 : W - 172, 702, 18, '#868e96');
+  }
+
+  // A cartoon game controller with the target face button glowing.
+  const PAD_CX = W / 2, PAD_CY = 612, FACE_X = PAD_CX + 150, FACE_GAP = 50, FACE_R = 27;
+
+  function drawControllerArea() {
+    const g = game, all = g.keys.all;
+    const target = screen === 'intro' ? g.keys.fresh[Math.floor(time) % g.keys.fresh.length] : currentLetter();
+
+    ctx.fillStyle = '#f6ecd9';
+    ctx.fillRect(0, ROAD_BOTTOM, W, H - ROAD_BOTTOM);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(0, ROAD_BOTTOM, W, 5);
+
+    // Body with two grips
+    const body = (dy, color) => {
+      ctx.fillStyle = color;
+      rr(ctx, PAD_CX - 260, PAD_CY - 92 + dy, 520, 150, 70); ctx.fill();
+      for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.ellipse(PAD_CX + sx * 195, PAD_CY + 30 + dy, 82, 78, sx * -0.35, 0, TAU);
+        ctx.fill();
+      }
+    };
+    body(8, 'rgba(0,0,0,0.18)');
+    body(0, '#495057');
+    ctx.fillStyle = '#5c636a';
+    rr(ctx, PAD_CX - 240, PAD_CY - 84, 480, 40, 20); ctx.fill();
+
+    // D-pad
+    const dx = PAD_CX - 150, dy = PAD_CY - 10;
+    ctx.fillStyle = '#343a40';
+    rr(ctx, dx - 15, dy - 42, 30, 84, 6); ctx.fill();
+    rr(ctx, dx - 42, dy - 15, 84, 30, 6); ctx.fill();
+    // Stick, select and start
+    ctx.fillStyle = '#343a40';
+    ctx.beginPath(); ctx.arc(PAD_CX - 70, PAD_CY + 50, 26, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(PAD_CX + 70, PAD_CY + 50, 26, 0, TAU); ctx.fill();
+    rr(ctx, PAD_CX - 46, PAD_CY - 24, 30, 12, 6); ctx.fill();
+    rr(ctx, PAD_CX + 16, PAD_CY - 24, 30, 12, 6); ctx.fill();
+
+    // Face buttons
+    for (const c of 'abxy') {
+      const [px, py] = PAD_POS[c];
+      const x = FACE_X + px * FACE_GAP, y = PAD_CY - 10 + py * FACE_GAP;
+      const flash = keyFlash[c], on = all.includes(c), color = PAD_COLORS[c];
+      let fill = on ? shade(color, 0.45) : '#868e96';
+      if (c === target) fill = color;
+      if (flash) fill = flash.ok ? '#8ce99a' : '#ff8787';
+      const down = flash ? 3 : 0;
+      if (c === target && !flash) {
+        ctx.save();
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 24 + Math.sin(time * 8) * 8;
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(x, y, FACE_R + 4, 0, TAU); ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.arc(x, y + 4, FACE_R, 0, TAU); ctx.fill();
+      ctx.fillStyle = fill;
+      ctx.beginPath(); ctx.arc(x, y + down, FACE_R, 0, TAU); ctx.fill();
+      if (c === target && !flash) {
+        ctx.strokeStyle = '#212529'; ctx.lineWidth = 3; ctx.stroke();
+      }
+      text(c.toUpperCase(), x, y + 2 + down, 28, on || c === target ? '#212529' : '#495057', { weight: 700 });
+    }
+
+    if (target) {
+      const [px, py] = PAD_POS[target];
+      const bob = Math.abs(Math.sin(time * 6)) * 6;
+      const ax = FACE_X + px * FACE_GAP, ay = PAD_CY - 10 + py * FACE_GAP - FACE_R - 6 - bob;
+      ctx.fillStyle = '#212529';
+      ctx.beginPath();
+      ctx.moveTo(ax - 10, ay - 12); ctx.lineTo(ax + 10, ay - 12); ctx.lineTo(ax, ay);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    if (!navigator.getGamepads || !connectedPad()) {
+      text('Connect the controller and press any button', W / 2, 700, 18, '#868e96');
+    } else if (target) {
+      text(`Press ${target.toUpperCase()}`, 170, 612, 34, shade(PAD_COLORS[target], -0.35), { weight: 700 });
+    }
   }
 
   // ---- Drawing: buttons & overlays ------------------------------------------
@@ -733,11 +829,13 @@
       text('Type whole words!', W / 2, 242, 22, '#868e96');
       text(g.keys.words.slice(0, 4).map(w => w.toUpperCase()).join('   '), W / 2, 302, 44, '#343a40', { weight: 700 });
     } else if (cfg.pool === 'all') {
-      text('All your keys!', W / 2, 242, 22, '#868e96');
+      text(cfg.pad ? 'All your buttons!' : 'All your keys!', W / 2, 242, 22, '#868e96');
       drawKeyRow([...g.keys.all], 302, 36, 6);
     } else {
       const isNew = [...cfg.keys].some(c => !learnedBefore(g.level).includes(c));
-      text(cfg.pool === 'mix' ? 'These keys, plus the ones you know' : isNew ? 'New keys' : 'Keys', W / 2, 242, 22, '#868e96');
+      const word = cfg.pad ? 'buttons' : 'keys';
+      text(cfg.pool === 'mix' ? `These ${word}, plus the ones you know` : isNew ? `New ${word}` : cfg.pad ? 'Buttons' : 'Keys',
+        W / 2, 242, 22, '#868e96');
       drawKeyRow([...cfg.keys], 302, 70, 14);
     }
 
@@ -745,9 +843,12 @@
       : cfg.perfect ? ['Be quick, and try to make zero oops!', 'Perfect typing earns 3 stars.']
       : ['Watch out for bikes!', 'Type before the bike reaches the puddle.'];
     if (cfg.world === 0) tips[1] += '  Feel the bumps on F and J.';
+    if (cfg.pad) {
+      tips[1] = cfg.calm ? 'Find the glowing button and press it.' : 'Press the button before the bike reaches the puddle.';
+    }
     text(tips[0], W / 2, 362, 20, '#495057', { weight: 700 });
     text(tips[1], W / 2, 390, 19, '#495057');
-    button(W / 2 - 130, 414, 260, 50, 'Start  (Space)', beginPlay);
+    button(W / 2 - 130, 414, 260, 50, cfg.pad ? 'Start  (press A)' : 'Start  (Space)', beginPlay);
   }
 
   // Key caps centered on cy, wrapping onto more rows when they don't fit the panel.
@@ -758,7 +859,13 @@
       const row = Math.floor(i / perRow), inRow = Math.min(perRow, keys.length - row * perRow);
       const x = W / 2 - (inRow * size + (inRow - 1) * gap) / 2 + (i % perRow) * (size + gap);
       const y = cy - (rows * size + (rows - 1) * gap) / 2 + row * (size + gap);
-      Art.key(ctx, x, y, size, size, c.toUpperCase(), { fill: FINGER_COLORS[fingerOf(c)], text: '#212529', size: size * 0.55 });
+      if (game.cfg.pad) {
+        ctx.fillStyle = keyColor(c);
+        ctx.beginPath(); ctx.arc(x + size / 2, y + size / 2, size / 2, 0, TAU); ctx.fill();
+        text(c.toUpperCase(), x + size / 2, y + size / 2 + 2, size * 0.55, '#212529', { weight: 700 });
+      } else {
+        Art.key(ctx, x, y, size, size, c.toUpperCase(), { fill: keyColor(c), text: '#212529', size: size * 0.55 });
+      }
     });
   }
 
@@ -827,7 +934,7 @@
     ctx.translate(W / 2, 470);
     ctx.scale(pulse, pulse);
     ctx.translate(-W / 2, -470);
-    button(W / 2 - 150, 442, 300, 58, 'Play  (Space)', goMenu);
+    button(W / 2 - 150, 442, 300, 58, connectedPad() ? 'Play  (press A)' : 'Play  (Space)', goMenu);
     ctx.restore();
   }
 
@@ -891,7 +998,7 @@
     });
 
     // World tabs
-    const tw = 170, tg = 12, tx0 = (W - (WORLDS.length * tw + (WORLDS.length - 1) * tg)) / 2, ty = 548;
+    const tg = 12, tw = Math.min(170, (W - 60 - (WORLDS.length - 1) * tg) / WORLDS.length), tx0 = (W - (WORLDS.length * tw + (WORLDS.length - 1) * tg)) / 2, ty = 548;
     WORLDS.forEach((wo, n) => {
       const x = tx0 + n * (tw + tg), here = n === w, open = isUnlocked(wo.start);
       ctx.fillStyle = here ? wo.color : open ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.45)';
@@ -900,7 +1007,7 @@
       buttons.push({ x, y: ty, w: tw, h: 40, onClick: () => { menuSel = wo.start; } });
     });
 
-    text('Arrow keys + Space, or click a level', W / 2, 614, 20, '#fff');
+    text('Arrow keys + Space, or click a level.  Controller: D-pad + A', W / 2, 614, 20, '#fff');
     button(W / 2 - 250, 642, 230, 50, save.sound ? 'Sound: on' : 'Sound: off', toggleSound, '#4dabf7');
     button(W / 2 + 20, 642, 230, 50, resetArmed > 0 ? 'Click to confirm' : 'Reset progress', resetProgress,
       resetArmed > 0 ? '#fa5252' : '#adb5bd');
@@ -984,6 +1091,7 @@
 
   window.addEventListener('keydown', e => {
     Sound.unlock();
+    lastInput = 'key';
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     let k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     k = SHIFTED[k] || k;
@@ -1017,6 +1125,47 @@
 
   window.addEventListener('blur', () => { if (screen === 'play') screen = 'pause'; });
 
+  // ---- Game controller ------------------------------------------------------
+  // Polled every frame. Face buttons play controller levels; on every other screen
+  // A works like Space, B like Esc, Start pauses/continues and the D-pad or stick moves.
+  const padHeld = {};
+  let stickDir = null;
+
+  function connectedPad() {
+    if (!navigator.getGamepads) return null;
+    for (const p of navigator.getGamepads()) if (p && p.connected) return p;
+    return null;
+  }
+
+  function padPress(btn) {
+    Sound.unlock();
+    lastInput = 'pad';
+    const face = PAD_BUTTONS[btn];
+    if (screen === 'play') {
+      if (btn === 9) handleKey('Escape', {});
+      else if (face && game.cfg.pad) typeKey(face);
+      return;
+    }
+    const map = { 0: ' ', 1: 'Escape', 9: ' ', 12: 'ArrowUp', 13: 'ArrowDown', 14: 'ArrowLeft', 15: 'ArrowRight' };
+    if (map[btn]) handleKey(map[btn], {});
+  }
+
+  function pollGamepads() {
+    const pad = connectedPad();
+    if (!pad) return;
+    pad.buttons.forEach((b, i) => {
+      const down = b.pressed || b.value > 0.5;
+      if (down && !padHeld[i]) padPress(i);
+      padHeld[i] = down;
+    });
+    // Left stick as arrows (also covers pads that report the D-pad as axes).
+    const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+    const dir = Math.abs(ax) > 0.6 ? (ax < 0 ? 'ArrowLeft' : 'ArrowRight')
+      : Math.abs(ay) > 0.6 ? (ay < 0 ? 'ArrowUp' : 'ArrowDown') : null;
+    if (dir && dir !== stickDir && screen !== 'play') { lastInput = 'pad'; handleKey(dir, {}); }
+    stickDir = dir;
+  }
+
   // ---- Main loop ------------------------------------------------------------
   function resize() {
     const dpr = window.devicePixelRatio || 1;
@@ -1035,6 +1184,7 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    pollGamepads();
     update(dt);
     render();
     requestAnimationFrame(frame);

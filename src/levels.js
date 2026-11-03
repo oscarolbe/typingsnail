@@ -12,12 +12,13 @@
 //   slow    multiplies the time per letter (bigger = easier)
 //   maxSpl  caps seconds per letter (forces speed in the expert levels)
 //   perfect 3 stars also need (almost) no wrong keys
+//   pad     game controller level: keys are face buttons (a, b, x, y), not keyboard keys
 
 const LEVELS = [];
 const WORLDS = [];
 
-function world(title, color) {
-  WORLDS.push({ title, color, start: LEVELS.length });
+function world(title, color, o = {}) {
+  WORLDS.push({ title, color, start: LEVELS.length, ...o });
 }
 function add(level) {
   LEVELS.push({ keys: '', pool: 'focus', lanes: 4, perLane: 2, slow: 1, world: WORLDS.length - 1, ...level });
@@ -80,10 +81,30 @@ review('Lightning', { perfect: true, maxSpl: 1.1, perLane: 4 });
 words('Long and fast', 5, 7, { perfect: true, maxSpl: 1.1, lanes: 5 });
 words('Snail master', 4, 7, { perfect: true, maxSpl: 0.9, lanes: 6 });
 
+// Game controller world: always open, with its own learned buttons.
+world('Controller', '#20c997', { pad: true });
+const pad = (fn, keys, o = {}) => fn(keys, { pad: true, perLane: 3, ...o });
+pad(meet, 'a', { title: 'Hello A', lanes: 3 });
+pad(meet, 'b', { title: 'Hello B', lanes: 3 });
+pad(meet, 'ab', { title: 'A and B' });
+pad(practice, 'ab', { title: 'Bikes are coming!', slow: 1.8 });
+pad(meet, 'xy', { title: 'Meet X and Y' });
+pad(practice, 'xy', { title: 'Practice X Y' });
+pad(mix, 'xy', { title: 'Mix X Y' });
+pad(review, '', { title: 'Button party', slow: 1.4 });
+pad(review, '', { title: 'Four button fun', slow: 1.2, perLane: 4 });
+pad(review, '', { title: 'Speedy buttons', perLane: 4 });
+pad(review, '', { title: 'Button master', perfect: true, maxSpl: 1, perLane: 5, lanes: 6 });
+
 // ---- Letters & words for a level -------------------------------------------
+// Keyboard and controller levels each have their own set of learned keys.
 function learnedBefore(index) {
   let keys = '';
-  for (let i = 0; i < index; i++) for (const c of LEVELS[i].keys) if (!keys.includes(c)) keys += c;
+  const pad = !!LEVELS[index].pad;
+  for (let i = 0; i < index; i++) {
+    if (!!LEVELS[i].pad !== pad) continue;
+    for (const c of LEVELS[i].keys) if (!keys.includes(c)) keys += c;
+  }
   return keys;
 }
 
@@ -157,6 +178,12 @@ const KB_ROWS = ['qwertyuiop', 'asdfghjkl;', 'zxcvbnm,./'];
 const TYPABLE = new Set(KB_ROWS.join(''));
 // Shift or Caps Lock versions of the punctuation keys count as the plain key.
 const SHIFTED = { ':': ';', '<': ',', '>': '.', '?': '/' };
+
+// Controller face buttons (Xbox-style layout, the usual one on Shanwan pads).
+// Standard Gamepad API mapping is by position: 0 bottom, 1 right, 2 left, 3 top.
+const PAD_BUTTONS = { 0: 'a', 1: 'b', 2: 'x', 3: 'y' };
+const PAD_COLORS = { a: '#51cf66', b: '#ff6b6b', x: '#4dabf7', y: '#fcc419' };
+const PAD_POS = { a: [0, 1], b: [1, 0], x: [-1, 0], y: [0, -1] };
 
 // How the voice says each key (plain letters get read as words otherwise).
 const KEY_SAY = {

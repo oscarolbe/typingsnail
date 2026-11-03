@@ -13,7 +13,7 @@ Online version: https://oscarolbe.github.io/typingsnail/ (deployed by GitHub Act
 
 ## How it works
 
-- 64 levels in 6 worlds, from never touching a keyboard to typing fast with no mistakes:
+- 64 keyboard levels in 6 worlds, from never touching a keyboard to typing fast with no mistakes:
   Home row → Reach out → Top row → Bottom row → Word wizard → Perfectionist.
 - It starts with a single key (`F`, then `J`). Every new pair of keys gets three levels:
   **Meet** (no bikes, no timer), **Practice** (slow bikes, only the new keys) and
@@ -28,6 +28,17 @@ Online version: https://oscarolbe.github.io/typingsnail/ (deployed by GitHub Act
 - You start with 5 snails. Stars: 5 saved = 3 stars, 3–4 = 2 stars, 1–2 = 1 star.
 - The bike speed adapts to the child: faster after quick crossings, slower after splashes.
   This is saved between sessions.
+
+## Game controller world
+
+A 7th world, **Controller**, practices the four face buttons (A, B, X, Y) of a game
+controller (tested layout: Xbox-style, like most Shanwan pads: Y top, X left, B right, A bottom).
+It is open from the start and keeps its own stars and bike speed. It starts with A, then B,
+then X and Y, and ends with mixed, faster levels.
+The bottom of the screen shows a controller with the button to press glowing.
+
+Plug in the controller and press any button so the browser notices it.
+In menus the D-pad or stick moves, A selects, B goes back and Start pauses.
 
 ## Tips for grown-ups
 
